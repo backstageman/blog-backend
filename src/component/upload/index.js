@@ -99,7 +99,8 @@ class PicturesWall extends React.Component {
     return (
       <div className="clearfix">
         <Upload
-          action={`http://localhost:9090/public/upload`}
+          // action={`http://localhost:9090/public/upload`}
+          action={`http://www.masksuperman.top/img`}
           listType="picture-card"
           accept='.img,.jpg,.jpeg,.png,.gif'
           headers={{ Authorization: `Bearer ${getToken()}` }}
