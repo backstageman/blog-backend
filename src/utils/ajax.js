@@ -33,7 +33,7 @@ ajax.interceptors.request.use(
 // 响应拦截配置
 ajax.interceptors.response.use(
   response => {
-    // console.log('response', response)
+    // console.log('succ-res', response)
     const res = response.data
     // console.log(typeof res.code);
     if (res.code !== 0) {
@@ -44,16 +44,27 @@ ajax.interceptors.response.use(
         })
       }
       const errMsg = res.msg || '请求失败'
-      message.error('msg', errMsg )
+      message.error('msg', errMsg)
       return Promise.reject(new Error(errMsg))
     } else {
       return res
     }
   },
-  err => {
-    const { msg } = err.response.data || '请求失败'
-    message.error(msg)
-    return Promise.reject(err)
+  error => {
+    const res = error.response.data
+    const { msg = '请求失败' } = res
+    // message.error(msg)
+    // return Promise.reject(error)
+    if (res.code !== 0) {
+      if (res.code === -2) {
+        return message.warning('Token 已失效，请重新登录', () => {
+          // 重定向到登录页面
+          return window.location.href = "/login"
+        })
+      }
+      message.error(msg)
+      return Promise.reject(res)
+    }
   }
 )
 
