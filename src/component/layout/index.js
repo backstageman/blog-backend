@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { Component } from 'react'
 import { Layout, Menu, Breadcrumb } from 'antd';
 import {
   PieChartOutlined,
@@ -10,14 +10,28 @@ import { NavLink } from 'react-router-dom';
 const { Content, Footer, Sider } = Layout;
 const { SubMenu } = Menu;
 
-class MainLayout extends React.Component {
-  state = {
-    collapsed: false,
+class MainLayout extends Component {
+  constructor(props) {
+    super(props)
+    this.state = {
+      collapsed: false,
+      openKeys: ['1', '3', '4', '6', '8']
+    }
+  }
+
+  onCollapse(collapsed) {
+    this.setState({ collapsed });
   };
 
-  onCollapse = collapsed => {
-    console.log(collapsed);
-    this.setState({ collapsed });
+  onOpenChange(openKeys) {
+    const latestOpenKey = openKeys.find(key => this.state.openKeys.indexOf(key) === -1);
+    if (this.rootSubmenuKeys.indexOf(latestOpenKey) === -1) {
+      this.setState({ openKeys });
+    } else {
+      this.setState({
+        openKeys: latestOpenKey ? [latestOpenKey] : [],
+      });
+    }
   };
 
   render() {
@@ -25,7 +39,12 @@ class MainLayout extends React.Component {
       <Layout style={{ minHeight: '100vh' }}>
         <Sider collapsible collapsed={this.state.collapsed} onCollapse={this.onCollapse}>
           <div className="logo" />
-          <Menu theme="dark" defaultSelectedKeys={['1']} mode="inline">
+          <Menu
+            theme="dark"
+            defaultSelectedKeys={['1']}
+            mode="inline"
+            onOpenChange={() => this.onOpenChange}
+          >
             <Menu.Item key="1" icon={<PieChartOutlined />}>
               <NavLink to="/">首页</NavLink>
             </Menu.Item>
@@ -43,7 +62,7 @@ class MainLayout extends React.Component {
               </Menu.Item>
               <Menu.Item key="8">
                 <NavLink to="/system/new">新功能</NavLink>
-                </Menu.Item>
+              </Menu.Item>
             </SubMenu>
           </Menu>
         </Sider>

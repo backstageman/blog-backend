@@ -1,9 +1,10 @@
 import React, { Component } from 'react'
+import { connect } from 'react-redux'
 import MyTable from '../../component/table'
 import { Select, Input, DatePicker, Button, Row, Col } from 'antd';
-import { getArticle } from '../../api/article'
-import { getAllArticleTypes } from '../../api/articleType'
 import ArticleServices from '../../service/article-services'
+import { actionCreators } from './store'
+import { actionCreators as ArticleActionCreators } from '../article/store'
 import './index.css'
 
 const { RangePicker } = DatePicker;
@@ -13,51 +14,41 @@ class ArticleList extends Component {
     constructor(props) {
         super(props)
         this.state = {
-            articleTypes: [],
             title: '',
             introduction: '',
             content: '',
-            articleType: '',
+            articleTypeid: '',
             createTimeStart: '',
             createTimeEnd: '',
             updateTimeStart: '',
-            updateTimeEnd: '',
-            articleList: [],
-            queryResult: {}
+            updateTimeEnd: ''
         }
     }
 
     componentDidMount() {
-        // 发送请求获取后台文章列表分类数据
-        getAllArticleTypes().then(res => {
-            // console.log(res);
-            if (res.data || res.data.length !== 0) {
-                this.setState({
-                    articleTypes: res.data
-                })
-            }
-        })
         // 获取文章列表
-        // getArticle().then(res => {
-        //     console.log(res);
-        //     if (res.data.list) {
-        //         this.setState({
-        //             articleList: res.data.list
-        //         })
-        //     }
-        // })
+        this.props.changeArticleList()
+        // 获取文章分类列表
+        this.props.getArticleTypes()
     }
 
     // 下拉框值改变的时候
     handleSelectChange(value) {
-        this.setState({
-            articleType: value
-        })
+        if (value) {
+            this.setState({
+                articleTypeid: value
+            })
+        } else {
+            this.setState({
+                articleTypeid: ''
+            })
+        }
+
     }
 
     handleInputChage(e) {
         const inputName = e.target.name
-        const inputValue = e.target.value
+        const inputValue = e.target.value || ''
         const obj = {}
         obj[inputName] = inputValue
         this.setState(obj)
@@ -66,7 +57,13 @@ class ArticleList extends Component {
     handleCreateDtChange(dates) {
         // moment.js获取时间的毫秒值的方式
         // console.log(dates[0].format('x'));
-        if (!dates) return
+        if (!dates) {
+            this.setState({
+                createTimeStart: '',
+                createTimeEnd: ''
+            })
+            return;
+        }
         let createTimeStart = dates[0].format('x')
         let createTimeEnd = dates[1].format('x')
         this.setState({
@@ -76,29 +73,33 @@ class ArticleList extends Component {
     }
 
     handleUpdateDtChange(dates) {
-        if (!dates) return
-        let updateTimeStart = dates[0].format('x')
-        let updateTimeEnd = dates[1].format('x')
-        this.setState({
-            updateTimeStart,
-            updateTimeEnd
-        })
+        if (dates) {
+            let updateTimeStart = dates[0].format('x')
+            let updateTimeEnd = dates[1].format('x')
+            this.setState({
+                updateTimeStart,
+                updateTimeEnd
+            })
+        } else {
+            this.setState({
+                updateTimeStart: '',
+                updateTimeEnd: ''
+            })
+        }
     }
 
     // 按条件搜索文章
     handleSearchClick() {
-        // console.log(this.state);
         let queryObj = ArticleServices.articleQueryObj(this.state)
+        // 需要将查询条件存储到store中，因为最终点击分页按钮会使用到查询条件
+        this.props.changeQueryParams(queryObj)
         // console.log(queryObj);
-        getArticle(queryObj).then(res => {
-            // console.log(res);
-            if (res.code === 0) {
-                this.setState({ queryResult: res })
-            }
-        })
+        this.props.changeArticleList(queryObj)
+
     }
 
     render() {
+        const { articleTypes, articleList } = this.props
         return (
             <div className="articlelist-container">
                 <div className="search-container">
@@ -108,6 +109,7 @@ class ArticleList extends Component {
                                 name="title"
                                 addonBefore="文章标题"
                                 style={{ paddingRight: 15 }}
+                                allowClear={true}
                                 onChange={(e) => { this.handleInputChage(e) }}
                             />
                         </Col>
@@ -116,6 +118,7 @@ class ArticleList extends Component {
                                 addonBefore="文章简介"
                                 name="introduction"
                                 style={{ paddingRight: 15 }}
+                                allowClear={true}
                                 onChange={(e) => { this.handleInputChage(e) }}
                             />
                         </Col>
@@ -124,6 +127,7 @@ class ArticleList extends Component {
                                 addonBefore="文章内容"
                                 name="content"
                                 style={{ paddingRight: 15 }}
+                                allowClear={true}
                                 onChange={(e) => { this.handleInputChage(e) }}
                             />
                         </Col>
@@ -135,11 +139,12 @@ class ArticleList extends Component {
                                 style={{ width: '100%' }}
                                 name="articleType"
                                 placeholder="请选择文章类别"
+                                allowClear={true}
                                 onChange={(value) => this.handleSelectChange(value)}>
                                 {
-                                    this.state.articleTypes.map(item => {
+                                    articleTypes.map(item => {
                                         return (
-                                            <Option value={item.id} key={item.id}> {item.typeName}</Option>
+                                            <Option value={item.get('id')} key={item.get('id')}> {item.get('typeName')}</Option>
                                         )
                                     })
                                 }
@@ -168,17 +173,35 @@ class ArticleList extends Component {
                             <Button
                                 type="primary"
                                 style={{ marginRight: 15 }}
-                                onClick={() => this.handleSearchClick()}
-                            >搜索</Button>
+                                onClick={() => this.handleSearchClick()}>
+                                搜索
+                            </Button>
                         </Col>
                     </Row>
                 </div>
                 <MyTable
-                    articleList={this.state.articleList}
+                    articleList={articleList}
                 />
             </div>
         )
     }
 }
 
-export default ArticleList
+const mapStateToProps = (state) => ({
+    articleList: state.getIn(['articleList', 'articleList']),
+    articleTypes: state.getIn(['article', 'articleTypes'])
+})
+
+const mapDispatchToProps = (dispatch) => ({
+    changeArticleList(queryObj) {
+        dispatch(actionCreators.getArticleList(queryObj))
+    },
+    getArticleTypes() {
+        dispatch(ArticleActionCreators.getArticleTypes())
+    },
+    changeQueryParams(queryParams){
+        dispatch(actionCreators.saveQueryParams(queryParams))
+    }
+})
+
+export default connect(mapStateToProps, mapDispatchToProps)(ArticleList)

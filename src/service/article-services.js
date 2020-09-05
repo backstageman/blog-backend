@@ -4,7 +4,7 @@ class ArticleServices {
         article.title = data.title
         article.introduction = data.introduction
         article.content = data.content
-        article.articleType = data.articleType
+        article.articleTypeid = data.articleTypeid
         article.isPublish = data.isPublish
         // 处理封面
         if (data.coverImgObj) {
@@ -35,15 +35,10 @@ class ArticleServices {
     // 处理搜索文章的查询条件
     static articleQueryObj(obj) {
         let queryObj = {}
-        if (JSON.stringify(obj) !== "{}") {
-            queryObj.title = obj.title 
-            queryObj.introduction = obj.introduction
-            queryObj.content = obj.content
-            queryObj.articleType = obj.articleType
-            queryObj.createTimeStart = obj.createTimeStart
-            queryObj.createTimeEnd = obj.createTimeEnd
-            queryObj.updateTimeStart = obj.updateTimeStart
-            queryObj.updateTimeEnd = obj.updateTimeEnd
+        for (let key in obj) {
+            if (obj[key].toString().trim().length !== 0) {
+                queryObj[key] = obj[key].toString().trim()
+            }
         }
         return queryObj
     }

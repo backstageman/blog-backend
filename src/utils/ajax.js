@@ -51,8 +51,12 @@ ajax.interceptors.response.use(
     }
   },
   error => {
-    const res = error.response.data
-    const { msg = '请求失败' } = res
+    console.dir(error);
+    if(!error.response){
+      return message.error(error.message)
+    }
+    const res = error.response.data 
+    const { msg = '请求失败' } = error.message
     // message.error(msg)
     // return Promise.reject(error)
     if (res.code !== 0) {

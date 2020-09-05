@@ -1,0 +1,2 @@
+export const CHANGE_ARTICLELIST = 'aritlceList/CHANGE_ARTICLELIST'
+export const CHANGE_QUERYPARAMS = 'aritlceList/CHANGE_QUERYPARAMS'

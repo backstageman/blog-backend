@@ -23,10 +23,11 @@ export function delArticle(id) {
     })
 }
 
-export function updateArticle(article) {
+export function updateArticle(aritcleid, article) {
     return axios({
         url: '/article',
         method: 'put',
+        params: { id: aritcleid },
         data: article
     })
 }

@@ -1,15 +1,17 @@
-import React from 'react'
+import React, { Component } from 'react'
+import { connect } from 'react-redux';
 import { Input, Button, Row, Col, Select, Switch, message } from 'antd';
-import PicturesWall from '../../component/upload/index'
+import { actionCreators } from './store'
 import { CloseOutlined, CheckOutlined } from '@ant-design/icons';
-import './index.css'
-import { getAllArticleTypes } from '../../api/articleType'
+import marked from 'marked'
+import PicturesWall from '../../component/upload/index'
 import { createArticle, getArticle, updateArticle } from '../../api/article'
 import ArticleServices from '../../service/article-services'
-import marked from 'marked'
+import './index.css'
+
 
 const { TextArea } = Input;
-// const { Option } = Select;
+const { Option } = Select;
 
 // 配置marked，解析markdown
 // `highlight` example uses `highlight.js`
@@ -29,26 +31,24 @@ marked.setOptions({
   xhtml: false
 });
 
-class CreateArticle extends React.Component {
+class CreateArticle extends Component {
   constructor(props) {
     super(props)
     this.state = {
       title: '',
       introduction: '',
       content: '',
-      coverImg: '',
-      illustration: '',
-      articleType: '',
       isPublish: true,
+      articleTypeid: '',
+      articleTypeName: '',
       contentHtml: '',
       introductionHtml: '',
-      articleTypes: [],
+      coverImg: '',
+      illustration: '',
       // 上传封面图片，子组件传给父组件的数据
       coverImgObj: {},
       // 内容插图的图片数组
       illustrationArrs: [],
-      // 数据回显的时候用来设定select的默认选择项目
-      articleTypeName: '',
       // 子组件的封面文件列表
       coverFileList: [],
       // 子组件的内容插图文件列表
@@ -58,20 +58,14 @@ class CreateArticle extends React.Component {
   }
 
   componentDidMount() {
-    // 发送请求获取后台文章列表分类数据
-    getAllArticleTypes().then(res => {
-      // console.log(res);
-      if (res.data || res.data.length !== 0) {
-        this.setState({
-          articleTypes: res.data
-        })
-      }
-    })
+    // 获取所有的分类数据
+    this.props.getArticleTypes()
     // this.props.match.params获取动态路由参数
     // console.log('hello', this.props.match.params.id);
     // 获得当前url
     // console.log(this.props.location.pathname);
-    if (this.props.location.pathname.indexOf('edit') !== -1) {
+    if (this.props.location.pathname.indexOf('edit') !== -1 && this.props.match.params.id) {
+      if (this.state.isUpdate) this.setState({ isUpdate: false })
       // 修改状态，表示是修改页面
       this.setState({
         isUpdate: true
@@ -81,22 +75,51 @@ class CreateArticle extends React.Component {
       // 发送请求修改文章
       getArticle({ id }).then(res => {
         // console.log(this.props.history);
-        // 跳转到文章编辑页面
         // this.props.history.push('/article/add/' + text.id)
         // let url = '/article/add/' + text.id
         // return <Redirect to={url} />
         // 将数据存入到locastorage中
         // 数据回显，写入到表格中
         if (res.data) {
+          // console.log(res.data);
           this.articleDataEcho(res.data)
         } else {
           message.error('发生了错误，请刷新页面')
         }
       }).catch(err => {
-        // 为什么这里不catch就会报错？
-        // console.log(err);
+        // 为什么这里不catch就会报错
+        // message.error(err)        
       })
     }
+  }
+
+  componentWillUnmount() {
+    // 清除跳转提醒定时器
+    this.creatArticleTimer && clearTimeout(this.creatArticleTimer)
+    this.updateArticleTimer && clearTimeout(this.updateArticleTimer)
+  }
+
+  // 修改文章的处理函数
+  handleUpdateSubmit() {
+    // 创建文章对象，添加数据，发送请求
+    const article = ArticleServices.createArticle(this.state)
+    // 获取文章id
+    const id = this.props.match.params.id
+    article.id = id
+    // 修改文章
+    updateArticle(id, article).then(res => {
+      // console.log(res);
+      if (res.code === 0) {
+        message.success('修改文章成功!')
+        message.info('3秒后跳转到列表页面。')
+        // 路由跳转
+        this.updateArticleTimer = setTimeout(() => {
+          this.props.history.push('/article/list')
+        }, 3000)
+      }
+    }).catch(e => {
+      message('文章修改失败，请稍后再试。')
+    })
   }
 
   // 数据回显，在表格中展示
@@ -104,13 +127,10 @@ class CreateArticle extends React.Component {
     const { title, introduction, content, coverImgid, coverImgUrl,
       illustrationsid, illustrationsUrl, isPublish, articleTypeid
     } = article
-    // console.log(article);
-    // console.log(this.state.articleType);
-    // console.log(this.state.articleTypes);
-    let contentHtml = marked(content)
-    let introductionHtml = marked(introduction)
-    let coverFileList = []
-    let illustrationFileList = []
+    const contentHtml = marked(content)
+    const introductionHtml = marked(introduction)
+    const coverFileList = []
+    const illustrationFileList = []
     if (coverImgid && coverImgUrl) {
       coverFileList.push(this.composeFileList(coverImgid, coverImgUrl))
     }
@@ -118,25 +138,27 @@ class CreateArticle extends React.Component {
       illustrationFileList.push(this.composeFileList(illustrationsid, illustrationsUrl))
     }
     let articleTypeName = ''
-    this.state.articleTypes.map((value, index) => {
-      if (value.id === +articleTypeid) {
-        articleTypeName = value.typeName
+    this.props.articleTypes.foreach(item => {
+      // console.log('value.id',item.get('id'));
+      if (item.get('id') === +articleTypeid) {
+        return articleTypeName = item.get('typeName')
       }
-      return true
     })
-    // console.log(articleTypeName);
-    let isPublishEscape = isPublish === 'true' ? true : false
+    const isPublishEscape = isPublish === 'true' ? true : false
     this.setState({
       title,
       introduction,
-      introductionHtml,
       content,
-      contentHtml,
       isPublish: isPublishEscape,
-      articleType: articleTypeid,
+      introductionHtml,
+      contentHtml,
+      articleTypeid,
       articleTypeName,
       coverFileList,
       illustrationFileList
+    }, () => {
+      // 更新下拉列表组件中的所选文章分类
+      this.handleSelectChange(articleTypeid)
     })
   }
 
@@ -187,71 +209,64 @@ class CreateArticle extends React.Component {
     })
   }
 
-  handleSubmit(e) {
-    e.preventDefault();
-    let { title, introduction, content, articleType } = this.state
-    // console.log(typeof title)
-    // console.log(typeof articleType)
-    // console.log(articleType)
-    // console.log(title.trim().length === 0)
+  handleSubmit() {
+    const { title, introduction, content, articleTypeid } = this.state
     if (title.trim().length === 0) {
       return message.error('文章标题不能为空')
     } else if (introduction.trim().length === 0) {
       return message.error('文章简介不能为空')
     } else if (content.trim().length === 0) {
       return message.error('文章内容不能为空')
-    } else if (articleType.toString().trim().length === 0) {
+    } else if (articleTypeid.toString().trim().length === 0) {
       return message.error('请选择文章分类')
     } else {
       // 创建文章对象，添加数据，发送请求
-      // console.log(this.state);
       const article = ArticleServices.createArticle(this.state)
-      // console.log(article);
-      if (!this.state.isUpdate) {
-        // 提交文章
-        createArticle(article).then(res => {
-          if (res.code === 0) {
-            message.success(res.msg)
-            // 清空表格内所有数据，清空表格校验结果，待完成
-            // 跳转到文章列表页面
-          } else {
-            message.error('文章添加失败，请检查文章内容。')
-          }
-        }).catch(e => {
-          message.error(e)
-        })
-        message.success('文章校验通过')
-      } else {
-        // 获取文章id
-        const id = this.props.match.params.id
-        article.id = id
-        // 修改文章
-        updateArticle(article).then(res => {
-          console.log(res);
-          if (res.code === 0) {
-            message.success('修改文章成功!')
-            // 路由跳转
+      message.success('文章校验通过')
+      // 提交文章
+      createArticle(article).then(res => {
+        if (res.code === 0) {
+          message.success(res.msg)
+          // 清空表格内所有数据，清空表格校验结果
+          this.clearArticleData()
+          message.info('3秒后跳转到文章列表页，即可查该文章。')
+          // 跳转到文章列表页面
+          this.creatArticleTimer = setTimeout(() => {
             this.props.history.push('/article/list')
-          }
-        }).catch(e => {
-          message('文章修改失败，请稍后再试。')
-        })
-      }
+          }, 3000)
+        } else {
+          message.error('文章添加失败，请检查文章内容。')
+        }
+      }).catch(e => {
+        message.error(e)
+      })
     }
+  }
+
+  //  清空表格内的数据
+  clearArticleData() {
+    this.setState({
+      title: '',
+      introduction: '',
+      content: '',
+      articleTypeid: '',
+      isPublish: true,
+      introductionHtml: '',
+      contentHtml: ''
+    })
   }
 
   // 处理回显以及select选择
   handleSelectChange(value) {
-    // console.log(value);
     let articleTypeName = ''
-    this.state.articleTypes.map((obj, index) => {
-      if (obj.id === +value) {
-        articleTypeName = obj.typeName
+    this.props.articleTypes.foreach(item => {
+      if (item.get('id') === +value) {
+        return articleTypeName = item.get('typeName')
       }
-      return true
     })
+    // 修改state中的articleTypeid
     this.setState({
-      articleType: value,
+      articleTypeid: value,
       articleTypeName
     })
   }
@@ -289,7 +304,8 @@ class CreateArticle extends React.Component {
   }
 
   render() {
-    const { title, introduction, content, articleTypes, articleType, articleTypeName, isUpdate, articleTypeid, introductionHtml, contentHtml } = this.state
+    const { title, introduction, content, isUpdate, introductionHtml, contentHtml, articleTypeName } = this.state
+    const { articleTypes } = this.props
     return (
       <div className="article-container">
         <Row>
@@ -367,13 +383,14 @@ class CreateArticle extends React.Component {
             <Select
               name="articleType"
               placeholder="请选择文章类别"
+              // 更新文章默认值得显示有问题
               value={isUpdate ? articleTypeName : '请选择文章类别'}
               onChange={(value) => this.handleSelectChange(value)}
             >
               {
                 articleTypes.map(item => {
                   return (
-                    <Select.Option value={item.id} key={item.id}>{item.typeName}</Select.Option>
+                    <Option value={item.get('id')} key={item.get('id')}>{item.get('typeName')}</Option>
                   )
                 })
               }
@@ -391,11 +408,16 @@ class CreateArticle extends React.Component {
         </Row>
         <Row>
           <Col span={8} offset={8}>
-            <Button type="primary" block onClick={(e) => { this.handleSubmit(e) }}>
-              {
-                this.state.isUpdate ? '提交修改' : '提交文章'
-              }
-            </Button>
+            {
+              this.state.isUpdate ?
+                <Button type="primary" block onClick={() => { this.handleUpdateSubmit() }}>
+                  提交修改
+                </Button>
+                :
+                <Button type="primary" block onClick={() => { this.handleSubmit() }}>
+                  提交文章
+                </Button>
+            }
           </Col>
         </Row>
       </div >
@@ -403,4 +425,14 @@ class CreateArticle extends React.Component {
   }
 }
 
-export default CreateArticle
+const mapStatetoProps = (state) => ({
+  articleTypes: state.getIn(['article', 'articleTypes'])
+})
+
+const mapDispatchToProps = (dispatch) => ({
+  getArticleTypes() {
+    dispatch(actionCreators.getArticleTypes())
+  }
+})
+
+export default connect(mapStatetoProps, mapDispatchToProps)(CreateArticle)

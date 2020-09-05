@@ -1,12 +1,14 @@
 import React from 'react'
 import { Table, Pagination, Button, Tooltip, message, Modal, Alert } from 'antd';
-import { getArticle, delArticle } from '../../api/article'
 import moment from 'moment'
 import {
   EditOutlined,
   DeleteOutlined,
   EyeOutlined
 } from '@ant-design/icons';
+import { connect } from 'react-redux';
+import { delArticle } from '../../api/article'
+import { actionCreators } from '../../page/articleList/store'
 
 class MyTable extends React.Component {
   constructor(props) {
@@ -93,7 +95,6 @@ class MyTable extends React.Component {
                 <Button type="danger"
                   shape="circle"
                   icon={<DeleteOutlined />}
-                  // onClick={() => { this.handleDeleteArticle(text) }} />
                   onClick={() => { this.showModal(text) }} />
               </Tooltip>
             </span>
@@ -103,37 +104,12 @@ class MyTable extends React.Component {
       articleList: [],
       pagination: {
         current: 1,
-        pageSize: 6,
+        pageSize: 10,
         showSizeChanger: true
       },
       currentRowObj: {},
       visible: false
     }
-  }
-
-  componentDidMount() {
-    this.getArticleListFromDB()
-  }
-
-  getArticleListFromDB() {
-    getArticle().then(res => {
-      // let articleList = []
-      // 为响应数据中添加key属性
-      // if (res.data.list) {
-      //   res.data.list.map((item, index) => {
-      //     articleList.push(Object.assign({}, item, { key: item.id }))
-      //     // return true 是因为map 函数必须返回
-      //     return true
-      //   })
-      // }
-      let { total, page, pageSize } = res.data
-      this.setState({
-        articleList: res.data.list,
-        pagination: {
-          total, page, pageSize
-        }
-      })
-    })
   }
 
   showModal(text) {
@@ -167,7 +143,7 @@ class MyTable extends React.Component {
       // console.log(res);
       if (res.code === 0) {
         message.success('删除成功')
-        this.getArticleListFromDB()
+        this.props.changeArticleList()
       } else {
         message.error(res.msg || '删除失败，请稍后再试')
       }
@@ -175,79 +151,57 @@ class MyTable extends React.Component {
   }
 
   handleUpdateArticle(text) {
-    // console.log(text.id);
-    if (!text) {
+    // 跳转到文章修改页面
+    if (text && text.id) {
+      // console.log(text);
+      return window.location = '/article/edit/' + text.id
+    } else {
       return message.error('发生了错误，请刷新页面')
     }
-    // 发送请求修改文章
-    getArticle({ id: text.id }).then(res => {
-      if (res.code === 0) {
-        // console.log(this.props.history);
-        // 跳转到文章编辑页面
-        // this.props.history.push('/article/add/' + text.id)
-        // let url = '/article/add/' + text.id
-        // return <Redirect to={url} />
-        // 将数据存入到locastorage中
-        // 跳转到文章修改页面
-        window.location = '/article/edit/' + text.id
-      }
-    }).catch(err => {
-      // 为什么这里不catch就会报错？
-      // console.log( err);
-    })
   }
-
-  handlePaginationChange(page, pageSize) {
-    // console.log(page);
-    // console.log(pageSize);
-    getArticle({ page, pageSize }).then(res => {
-      let { total, page, pageSize } = res.data
-      this.setState({
-        articleList: res.data.list,
-        pagination: {
-          total, page, pageSize
-        }
-      })
-    })
-  }
-
-  handleShowSizeChange(current, pageSize) {
-    getArticle({ pageSize }).then(res => {
-      let { total, page, pageSize } = res.data
-      this.setState({
-        articleList: res.data.list,
-        pagination: {
-          total, page, pageSize
-        }
-      })
-    })
+  
+  handleChange(current, pageSize) {
+    let newQueryObj = {}
+    // console.log(current, pageSize);
+    // 遍历查询条件
+    if (JSON.stringify(this.props.queryObj) !== '{}') {
+      // console.log(this.props.queryObj.toJS());
+      // console.log(this.props.queryObj);
+      Object.assign(newQueryObj, this.props.queryObj.toJS())
+    }
+    newQueryObj.current = current
+    newQueryObj.pageSize = pageSize
+    this.props.changeArticleList(newQueryObj);
   }
 
   render() {
+    const { columns } = this.state
+    const { articleList, current, pageSize, total } = this.props
     return (
       <>
         <Table
           bordered
-          columns={this.state.columns}
-          dataSource={this.state.articleList}
+          columns={columns}
+          dataSource={articleList.toJS()}
           pagination={false}
           rowKey={record => record.id}
         // scroll={{ x: 1500, y: 300 }}
         />
         <Pagination
-          total={this.state.pagination.total}
-          pageSize={this.state.pagination.pageSize}
+          current={current}
+          total={total}
+          pageSize={pageSize}
           defaultCurrent={1}
           showSizeChanger
           showQuickJumper
           showTotal={total => `总计：${total} 条`}
-          onChange={(page, pageSize) => this.handlePaginationChange(page, pageSize)}
-          onShowSizeChange={(current, pageSize) => this.handleShowSizeChange(current, pageSize)}
+          onChange={(page, pageSize) => this.handleChange(page, pageSize)}
+          onShowSizeChange={(current, pageSize) => this.handleChange(current, pageSize)}
           style={{ marginTop: 25, textAlign: "right" }}
           responsive={true}
         />
         <Modal
-          title="Basic Modal"
+          title="是否确认删除？"
           visible={this.state.visible}
           onOk={() => this.handleConfirmDelete()}
           onCancel={() => this.handleCancelDelete()}
@@ -259,4 +213,18 @@ class MyTable extends React.Component {
   }
 }
 
-export default MyTable
+const mapStateToProps = (state) => ({
+  articleList: state.getIn(['articleList', 'articleList']),
+  current: state.getIn(['articleList', 'current']),
+  pageSize: state.getIn(['articleList', 'pageSize']),
+  total: state.getIn(['articleList', 'total']),
+  queryObj: state.getIn(['articleList', 'queryObj']),
+})
+
+const mapDispatchToProps = (dispatch) => ({
+  changeArticleList(queryObj) {
+    dispatch(actionCreators.getArticleList(queryObj))
+  }
+})
+
+export default connect(mapStateToProps, mapDispatchToProps)(MyTable)
